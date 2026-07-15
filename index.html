@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTO-LP キーワードダッシュボード</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1a2233;
+    --sub: #6b7690;
+    --line: #e3e8f0;
+    --accent: #2563eb;
+    --accent-soft: #eff4ff;
+    --green: #059669;
+    --green-soft: #d9f2e5;
+    --amber: #d97706;
+    --amber-soft: #fdf0da;
+    --red: #dc2626;
+    --red-soft: #fdeaea;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    background: var(--bg); color: var(--ink); font-size: 14px;
+  }
+  header {
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 14px 28px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 20;
+  }
+  header h1 { font-size: 18px; }
+  .freshness { font-size: 12px; display: flex; gap: 10px; align-items: center; }
+  .fresh-pill { border-radius: 999px; padding: 3px 10px; font-weight: 600; }
+  .fresh-ok { background: var(--green-soft); color: var(--green); }
+  .fresh-warn { background: var(--amber-soft); color: var(--amber); }
+  .fresh-err { background: var(--red-soft); color: var(--red); }
+  header .sel-badge {
+    margin-left: auto; background: var(--accent); color: #fff;
+    border-radius: 999px; padding: 5px 14px; font-size: 13px; cursor: pointer; border: none;
+  }
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 28px 80px; }
+
+  .banner {
+    border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+    line-height: 1.7;
+  }
+  .banner.warn { background: var(--amber-soft); color: #7c4a03; border: 1px solid #f3ddb0; }
+  .banner.err { background: var(--red-soft); color: #8a1f1f; border: 1px solid #f5c6c6; }
+  .banner code { background: rgba(0,0,0,.06); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+
+  /* セラーボタン */
+  .sellers { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .seller-btn {
+    background: var(--card); border: 2px solid var(--line); border-radius: var(--radius);
+    padding: 12px 14px; text-align: left; cursor: pointer; transition: all .15s;
+  }
+  .seller-btn:hover { border-color: #b9c6e2; }
+  .seller-btn.active { border-color: var(--accent); background: var(--accent-soft); }
+  .seller-btn .name { font-weight: 700; font-size: 14px; }
+  .seller-btn .domain { color: var(--sub); font-size: 11px; margin-top: 2px; }
+  .seller-btn .stats { color: var(--sub); font-size: 11px; margin-top: 6px; }
+  .seller-btn .stats b { color: var(--ink); }
+  .seller-btn.own { border-style: dashed; }
+  .seller-btn.own.active { border-style: solid; }
+  .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background: var(--green); margin-right: 4px; }
+
+  /* タブ（自社のみ） */
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px 8px 0 0;
+    padding: 9px 18px; font-size: 13px; cursor: pointer; color: var(--sub); font-weight: 600;
+  }
+  .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--accent-soft); }
+
+  /* フィルター */
+  .filters {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    margin-bottom: 14px;
+  }
+  .filters input[type="text"], .filters select {
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px;
+    font-family: inherit;
+  }
+  .filters input[type="text"] { width: 220px; }
+  .filters label { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 13px; cursor: pointer; }
+  .filters .count { margin-left: auto; color: var(--sub); font-size: 12px; }
+
+  /* テーブル */
+  .table-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+  th {
+    background: #f8fafd; color: var(--sub); font-size: 12px; font-weight: 600;
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  th .arrow { font-size: 10px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:hover td { background: #fafbfe; }
+  tr.selected td { background: var(--accent-soft); }
+  .kw { font-weight: 600; }
+  .kw .url { display: block; font-weight: 400; font-size: 11px; color: var(--sub); }
+  .pos-badge { display: inline-block; min-width: 34px; text-align: center; border-radius: 6px; padding: 2px 7px; font-weight: 700; font-size: 12px; }
+  .pos-good { background: var(--green-soft); color: var(--green); }
+  .pos-mid { background: var(--amber-soft); color: var(--amber); }
+  .pos-low { background: #f0f2f7; color: var(--sub); }
+  .pos-none { color: #c3cbdc; font-weight: 400; }
+  .gap-flag { color: var(--red); font-size: 11px; font-weight: 700; }
+  input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  .more-row td { text-align: center; padding: 12px; }
+  .more-row button {
+    background: none; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 22px; cursor: pointer; color: var(--accent); font-size: 13px;
+  }
+  .ch-list { font-size: 11px; color: var(--sub); line-height: 1.6; }
+  .ch-bar { display: inline-block; height: 7px; background: var(--accent); border-radius: 3px; margin-right: 6px; vertical-align: middle; opacity: .75; }
+
+  /* 選定パネル */
+  .drawer {
+    position: fixed; top: 0; right: -420px; width: 400px; height: 100vh;
+    background: var(--card); border-left: 1px solid var(--line);
+    box-shadow: -8px 0 24px rgba(20,30,60,.08); z-index: 40;
+    transition: right .2s; display: flex; flex-direction: column;
+  }
+  .drawer.open { right: 0; }
+  .drawer-head { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .drawer-head h2 { font-size: 15px; }
+  .drawer-head .close { margin-left: auto; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--sub); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 10px 20px; }
+  .sel-item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .sel-item .v { color: var(--sub); font-size: 11px; margin-left: auto; white-space: nowrap; }
+  .sel-item .rm { background: none; border: none; color: var(--red); cursor: pointer; font-size: 15px; }
+  .drawer-foot { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  .drawer-foot button {
+    flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .btn-csv { background: var(--accent); color: #fff; }
+  .btn-copy { background: var(--accent-soft); color: var(--accent); }
+  .btn-clear { background: var(--red-soft); color: var(--red); flex: 0 0 auto; padding: 10px 14px !important; }
+  .empty { color: var(--sub); text-align: center; padding: 40px 0; font-size: 13px; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 22px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 60;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="gate" style="position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 40px;width:340px;text-align:center">
+    <div style="font-size:17px;font-weight:700;margin-bottom:6px">AUTO-LP ダッシュボード</div>
+    <div style="color:var(--sub);font-size:12px;margin-bottom:20px">合言葉を入力してください</div>
+    <input type="password" id="gateInput" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:12px" placeholder="パスコード">
+    <button onclick="checkGate()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer">開く</button>
+    <div id="gateErr" style="color:var(--red);font-size:12px;margin-top:10px;visibility:hidden">パスコードが違います</div>
+  </div>
+</div>
+
+<header>
+  <h1>AUTO-LP キーワードダッシュボード</h1>
+  <div class="freshness" id="freshness"></div>
+  <button class="sel-badge" id="selBadge" onclick="toggleDrawer()">選定リスト 0</button>
+</header>
+
+<main>
+  <div id="banner"></div>
+  <div class="sellers" id="sellers"></div>
+  <div class="tabs" id="tabs" style="display:none">
+    <button class="tab" id="tabKw" onclick="setTab('kw')">キーワード（GSC実測）</button>
+    <button class="tab" id="tabGa4" onclick="setTab('ga4')">LP別セッション内訳（GA4）</button>
+  </div>
+
+  <div class="filters" id="filters">
+    <input type="text" id="q" placeholder="キーワード検索…">
+    <select id="minVol">
+      <option value="0">検索数: すべて</option>
+      <option value="100">100以上</option>
+      <option value="500">500以上</option>
+      <option value="1000">1,000以上</option>
+      <option value="5000">5,000以上</option>
+    </select>
+    <label id="lblGap"><input type="checkbox" id="gapOnly"> 自社が圏外のKWのみ（狙い目）</label>
+    <label id="lblTop10"><input type="checkbox" id="top10Only"> このセラーがTOP10のKWのみ</label>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="table-card">
+    <table>
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2>選定キーワード（LP/記事化候補）</h2>
+    <button class="close" onclick="toggleDrawer()">×</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot">
+    <button class="btn-csv" onclick="exportCsv()">CSVダウンロード</button>
+    <button class="btn-copy" onclick="copyList()">コピー</button>
+    <button class="btn-clear" onclick="clearAll()">全解除</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="data.js"></script>
+<script src="own_data.js"></script>
+<script>
+// 簡易ゲート（SHA-256ハッシュ照合）。完全な秘匿ではなく身内向けの目隠し。
+const GATE_HASH = '3e2c61c8b41d0f94aa8a48fbb6a595e0536820f32e8f01b78a87b397fc4e6698';
+async function sha256(t) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+async function checkGate() {
+  const v = document.getElementById('gateInput').value.trim();
+  if (await sha256(v) === GATE_HASH) {
+    sessionStorage.setItem('autolp_gate', 'ok');
+    document.getElementById('gate').style.display = 'none';
+  } else {
+    document.getElementById('gateErr').style.visibility = 'visible';
+  }
+}
+if (sessionStorage.getItem('autolp_gate') === 'ok' || location.protocol === 'file:') {
+  document.getElementById('gate').style.display = 'none';
+}
+document.getElementById('gateInput').addEventListener('keydown', e => { if (e.key === 'Enter') checkGate(); });
+</script>
+<script>
+const OWN = typeof OWN_DATA !== 'undefined' ? OWN_DATA : null;
+const hasGsc = !!(OWN && OWN.gsc.rows.length);
+const hasGa4 = !!(OWN && OWN.ga4.rows.length);
+
+// レポートの検索ボリュームをGSCクエリに紐付けるためのマップ
+const VOL_MAP = {};
+KEYWORDS.forEach(k => { VOL_MAP[k.kw] = k; });
+
+const state = {
+  seller: 'brainsleep',
+  tab: 'kw',
+  q: '',
+  minVol: 0,
+  gapOnly: false,
+  top10Only: false,
+  sortKey: 'vol',
+  sortDesc: true,
+  limit: 100,
+  selected: JSON.parse(localStorage.getItem('autolp_selected') || '{}'),
+};
+
+const $ = id => document.getElementById(id);
+
+function posClass(p) {
+  if (p == null) return 'pos-none';
+  if (p <= 10) return 'pos-badge pos-good';
+  if (p <= 30) return 'pos-badge pos-mid';
+  return 'pos-badge pos-low';
+}
+function posText(p) { return p == null ? '圏外' : (Number.isInteger(p) ? p : p.toFixed(1)) + '位'; }
+function fmt(n) { return n == null ? '–' : Math.round(n).toLocaleString('ja-JP'); }
+function pct(x) { return x == null ? '–' : (x * 100).toFixed(1) + '%'; }
+function esc(s) { return s.replace(/'/g, "\\'"); }
+
+/* ---------- 鮮度表示（R1: 最終更新時刻を必ず確認） ---------- */
+function renderFreshness() {
+  const el = $('freshness');
+  if (!OWN) {
+    el.innerHTML = `<span class="fresh-pill fresh-warn">自社ライブデータ未取得</span>
+      <span style="color:var(--sub)">レポートデータ: ${META.source}</span>`;
+    return;
+  }
+  const fetched = new Date(OWN.fetched_at);
+  const ageH = (Date.now() - fetched.getTime()) / 3600000;
+  const ts = OWN.fetched_at.replace('T', ' ').slice(0, 16);
+  const cls = ageH < 24 ? 'fresh-ok' : 'fresh-warn';
+  const note = ageH < 24 ? '' : `（${Math.floor(ageH / 24)}日以上前・更新推奨）`;
+  el.innerHTML = `
+    <span class="fresh-pill ${cls}">GSC/GA4 取得: ${ts}${note}</span>
+    ${OWN.errors.gsc ? '<span class="fresh-pill fresh-err">GSCエラー</span>' : `<span style="color:var(--sub)">GSC ${OWN.gsc.period[0]}〜${OWN.gsc.period[1]}</span>`}
+    ${OWN.errors.ga4 ? '<span class="fresh-pill fresh-err">GA4エラー</span>' : `<span style="color:var(--sub)">GA4 ${OWN.ga4.period[0]}〜${OWN.ga4.period[1]}</span>`}`;
+}
+
+function renderBanner() {
+  const b = $('banner');
+  if (!OWN) {
+    b.innerHTML = `<div class="banner warn">
+      自社のGSC・GA4ライブデータがまだ取得されていません。
+      <code>cd auto-lp\\src</code> → <code>python -m auto_lp.refresh_dashboard</code> を実行すると、
+      自社ボタンにサーチコンソール実測キーワードとGA4セッション内訳が表示されます。
+      （事前にGCPでAPI有効化＋サービスアカウント権限付与が必要。auto-lp/README.md 参照）</div>`;
+    return;
+  }
+  const msgs = [];
+  if (OWN.errors.gsc) msgs.push(`<b>GSC取得エラー:</b> <code>${OWN.errors.gsc}</code>`);
+  if (OWN.errors.ga4) msgs.push(`<b>GA4取得エラー:</b> <code>${OWN.errors.ga4}</code>`);
+  b.innerHTML = msgs.length
+    ? `<div class="banner err">${msgs.join('<br>')}<br>
+       権限設定（auto-lp/README.md「必要な権限設定」）を確認後、
+       <code>python -m auto_lp.refresh_dashboard</code> を再実行してください。</div>`
+    : '';
+}
+
+/* ---------- セラーボタン ---------- */
+function renderSellers() {
+  $('sellers').innerHTML = META.sellers.map(s => {
+    const isOwn = s.id === 'hirunegao';
+    const cnt = isOwn && hasGsc
+      ? OWN.gsc.rows.length
+      : KEYWORDS.filter(k => s.id in k.positions).length;
+    const label = isOwn && hasGsc
+      ? `<span class="live-dot"></span>GSC実測 <b>${cnt}</b> クエリ`
+      : `レポート内 <b>${cnt}</b> KW ／ 流入 ${fmt(s.traffic)}`;
+    return `<button class="seller-btn ${isOwn ? 'own' : ''} ${state.seller === s.id ? 'active' : ''}"
+      onclick="selectSeller('${s.id}')">
+      <div class="name">${s.name}</div>
+      <div class="domain">${s.domain}</div>
+      <div class="stats">${label}</div>
+    </button>`;
+  }).join('');
+}
+
+function selectSeller(id) {
+  state.seller = id;
+  state.limit = 100;
+  state.tab = 'kw';
+  renderSellers();
+  render();
+}
+
+function setTab(t) {
+  state.tab = t;
+  state.limit = 100;
+  render();
+}
+
+/* ---------- 競合ビュー（レポートデータ） ---------- */
+function filteredRival() {
+  const s = state.seller;
+  let rows = KEYWORDS.filter(k => s in k.positions);
+  if (state.q) rows = rows.filter(k => k.kw.includes(state.q));
+  if (state.minVol) rows = rows.filter(k => k.vol >= state.minVol);
+  if (state.gapOnly) rows = rows.filter(k => !('hirunegao' in k.positions));
+  if (state.top10Only) rows = rows.filter(k => k.positions[s] <= 10);
+  const d = state.sortDesc ? -1 : 1;
+  const key = state.sortKey;
+  rows.sort((a, b) => {
+    let va, vb;
+    if (key === 'kw') return a.kw.localeCompare(b.kw, 'ja') * d;
+    if (key === 'pos') { va = a.positions[s] ?? 999; vb = b.positions[s] ?? 999; }
+    else if (key === 'own') { va = a.positions.hirunegao ?? 999; vb = b.positions.hirunegao ?? 999; }
+    else if (key === 'ad') { va = a.ad ?? -1; vb = b.ad ?? -1; }
+    else { va = a.vol; vb = b.vol; }
+    return (va - vb) * d;
+  });
+  return rows;
+}
+
+function chanceLabel(k) {
+  const s = state.seller;
+  const own = k.positions.hirunegao;
+  const rival = k.positions[s];
+  if (own == null && rival <= 10 && k.vol >= 500) return '<span class="gap-flag">◎ 狙い目</span>';
+  if (own == null && rival <= 20) return '<span class="gap-flag">○ 候補</span>';
+  if (own != null && rival != null && own - rival >= 20) return '<span style="color:var(--amber);font-size:11px;font-weight:700">△ 差が大</span>';
+  return '';
+}
+
+function renderRival() {
+  const s = state.seller;
+  const sellerName = META.sellers.find(x => x.id === s).name.replace(/ \(.*\)/, '');
+  $('thead').innerHTML = `<tr>
+    <th style="width:36px"></th>
+    <th data-sort="kw">キーワード <span class="arrow"></span></th>
+    <th class="num" data-sort="pos">${sellerName}順位 <span class="arrow"></span></th>
+    <th class="num" data-sort="own">自社順位 <span class="arrow"></span></th>
+    <th class="num" data-sort="vol">月間検索数 <span class="arrow"></span></th>
+    <th class="num" data-sort="ad">広告出稿 <span class="arrow"></span></th>
+    <th>チャンス</th>
+  </tr>`;
+  const rows = filteredRival();
+  const shown = rows.slice(0, state.limit);
+  $('count').textContent = `${rows.length} KW（表示 ${shown.length}）`;
+  $('tbody').innerHTML = shown.map(k => {
+    const sel = state.selected[k.kw];
+    return `<tr class="${sel ? 'selected' : ''}">
+      <td><input type="checkbox" ${sel ? 'checked' : ''} onchange="toggleKw('${esc(k.kw)}')"></td>
+      <td class="kw">${k.kw}${k.own_url ? `<span class="url">${k.own_url}</span>` : ''}</td>
+      <td class="num"><span class="${posClass(k.positions[s])}">${posText(k.positions[s])}</span></td>
+      <td class="num"><span class="${posClass(k.positions.hirunegao)}">${posText(k.positions.hirunegao)}</span></td>
+      <td class="num">${fmt(k.vol)}</td>
+      <td class="num">${k.ad != null ? k.ad.toFixed(2) : '–'}</td>
+      <td>${chanceLabel(k)}</td>
+    </tr>`;
+  }).join('') + moreRow(rows.length, 7);
+}
+
+/* ---------- 自社ビュー：GSC実測キーワード ---------- */
+function filteredOwnKw() {
+  let rows = OWN.gsc.rows;
+  if (state.q) rows = rows.filter(r => r.q.includes(state.q));
+  if (state.minVol) rows = rows.filter(r => (VOL_MAP[r.q]?.vol ?? 0) >= state.minVol);
+  if (state.top10Only) rows = rows.filter(r => r.pos != null && r.pos <= 10);
+  const d = state.sortDesc ? -1 : 1;
+  const key = state.sortKey;
+  rows = [...rows].sort((a, b) => {
+    let va, vb;
+    if (key === 'kw') return a.q.localeCompare(b.q, 'ja') * d;
+    if (key === 'pos') { va = a.pos ?? 999; vb = b.pos ?? 999; }
+    else if (key === 'imp') { va = a.imp; vb = b.imp; }
+    else if (key === 'ctr') { va = a.ctr; vb = b.ctr; }
+    else if (key === 'vol') { va = VOL_MAP[a.q]?.vol ?? 0; vb = VOL_MAP[b.q]?.vol ?? 0; }
+    else { va = a.clicks; vb = b.clicks; }
+    return (va - vb) * d;
+  });
+  return rows;
+}
+
+function renderOwnKw() {
+  $('thead').innerHTML = `<tr>
+    <th style="width:36px"></th>
+    <th data-sort="kw">検索クエリ（GSC） <span class="arrow"></span></th>
+    <th class="num" data-sort="pos">平均掲載順位 <span class="arrow"></span></th>
+    <th class="num" data-sort="clicks">クリック <span class="arrow"></span></th>
+    <th class="num" data-sort="imp">表示回数 <span class="arrow"></span></th>
+    <th class="num" data-sort="ctr">CTR <span class="arrow"></span></th>
+    <th class="num" data-sort="vol">月間検索数 <span class="arrow"></span></th>
+    <th>ページ</th>
+  </tr>`;
+  const rows = filteredOwnKw();
+  const shown = rows.slice(0, state.limit);
+  $('count').textContent = `${rows.length} クエリ（表示 ${shown.length}）／期間 ${OWN.gsc.period[0]}〜${OWN.gsc.period[1]}`;
+  $('tbody').innerHTML = shown.map(r => {
+    const sel = state.selected[r.q];
+    const vol = VOL_MAP[r.q]?.vol;
+    return `<tr class="${sel ? 'selected' : ''}">
+      <td><input type="checkbox" ${sel ? 'checked' : ''} onchange="toggleKw('${esc(r.q)}')"></td>
+      <td class="kw">${r.q}</td>
+      <td class="num"><span class="${posClass(r.pos)}">${posText(r.pos)}</span></td>
+      <td class="num">${fmt(r.clicks)}</td>
+      <td class="num">${fmt(r.imp)}</td>
+      <td class="num">${pct(r.ctr)}</td>
+      <td class="num">${vol != null ? fmt(vol) : '–'}</td>
+      <td style="font-size:11px;color:var(--sub)">${r.page}</td>
+    </tr>`;
+  }).join('') + moreRow(rows.length, 8);
+}
+
+/* ---------- 自社ビュー：GA4 LP別セッション内訳 ---------- */
+function renderGa4() {
+  $('thead').innerHTML = `<tr>
+    <th>ランディングページ</th>
+    <th class="num">セッション</th>
+    <th class="num">ユーザー</th>
+    <th class="num">CV</th>
+    <th class="num">売上</th>
+    <th>流入チャネル内訳（上位）</th>
+  </tr>`;
+  let rows = OWN.ga4.rows;
+  if (state.q) rows = rows.filter(r => r.lp.includes(state.q));
+  const shown = rows.slice(0, state.limit);
+  const maxS = rows.length ? rows[0].sessions : 1;
+  $('count').textContent = `${rows.length} LP（表示 ${shown.length}）／期間 ${OWN.ga4.period[0]}〜${OWN.ga4.period[1]}`;
+  $('tbody').innerHTML = shown.map(r => `
+    <tr>
+      <td class="kw" style="max-width:340px;overflow-wrap:anywhere">${r.lp}</td>
+      <td class="num"><span class="ch-bar" style="width:${Math.max(4, r.sessions / maxS * 90)}px"></span>${fmt(r.sessions)}</td>
+      <td class="num">${fmt(r.users)}</td>
+      <td class="num">${r.conv || '–'}</td>
+      <td class="num">${r.revenue ? '¥' + fmt(r.revenue) : '–'}</td>
+      <td class="ch-list">${r.channels.map(([ch, n]) => `${ch}: <b>${fmt(n)}</b>`).join('<br>')}</td>
+    </tr>`).join('') + moreRow(rows.length, 6);
+}
+
+/* ---------- 共通 ---------- */
+function moreRow(total, colspan) {
+  return total > state.limit
+    ? `<tr class="more-row"><td colspan="${colspan}"><button onclick="state.limit+=100;render()">さらに100件表示（残り ${total - state.limit}）</button></td></tr>`
+    : '';
+}
+
+function render() {
+  const isOwn = state.seller === 'hirunegao';
+  const ownLive = isOwn && (hasGsc || hasGa4);
+  $('tabs').style.display = ownLive ? 'flex' : 'none';
+  if (ownLive) {
+    $('tabKw').className = 'tab' + (state.tab === 'kw' ? ' active' : '');
+    $('tabGa4').className = 'tab' + (state.tab === 'ga4' ? ' active' : '');
+  }
+  $('lblGap').style.display = isOwn ? 'none' : 'flex';
+  const ga4View = ownLive && state.tab === 'ga4';
+  $('minVol').style.display = ga4View ? 'none' : '';
+  $('lblTop10').style.display = ga4View ? 'none' : 'flex';
+  $('q').placeholder = ga4View ? 'LPパスで検索…' : 'キーワード検索…';
+
+  if (ga4View && hasGa4) renderGa4();
+  else if (isOwn && hasGsc) renderOwnKw();
+  else renderRival();
+
+  updateHeadArrows();
+  renderDrawer();
+}
+
+function updateHeadArrows() {
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.querySelector('.arrow').textContent =
+      th.dataset.sort === state.sortKey ? (state.sortDesc ? '▼' : '▲') : '';
+    th.onclick = () => {
+      const key = th.dataset.sort;
+      if (state.sortKey === key) state.sortDesc = !state.sortDesc;
+      else { state.sortKey = key; state.sortDesc = key !== 'pos' && key !== 'own' && key !== 'kw'; }
+      render();
+    };
+  });
+}
+
+function toggleKw(kw) {
+  if (state.selected[kw]) {
+    delete state.selected[kw];
+  } else {
+    const k = VOL_MAP[kw];
+    const gsc = hasGsc ? OWN.gsc.rows.find(r => r.q === kw) : null;
+    state.selected[kw] = {
+      vol: k?.vol ?? null,
+      ad: k?.ad ?? null,
+      own: gsc?.pos ?? k?.positions?.hirunegao ?? null,
+      clicks: gsc?.clicks ?? null,
+      rival: state.seller === 'hirunegao' ? null : (k?.positions?.[state.seller] ?? null),
+      rivalName: state.seller === 'hirunegao' ? null : state.seller,
+      addedAt: new Date().toISOString().slice(0, 10),
+    };
+  }
+  persist();
+  render();
+}
+
+function persist() {
+  localStorage.setItem('autolp_selected', JSON.stringify(state.selected));
+  $('selBadge').textContent = `選定リスト ${Object.keys(state.selected).length}`;
+}
+
+function renderDrawer() {
+  persist();
+  const entries = Object.entries(state.selected);
+  $('drawerBody').innerHTML = entries.length === 0
+    ? '<div class="empty">まだ選定されていません。<br>テーブルのチェックボックスで追加できます。</div>'
+    : entries.map(([kw, v]) => `
+      <div class="sel-item">
+        <span>${kw}</span>
+        <span class="v">${v.vol != null ? fmt(v.vol) + '／月' : ''}${v.rivalName ? `・${v.rivalName} ${v.rival}位` : ''}${v.clicks != null ? `・自社${fmt(v.clicks)}cl` : ''}</span>
+        <button class="rm" onclick="toggleKw('${esc(kw)}')">×</button>
+      </div>`).join('');
+}
+
+function toggleDrawer() { $('drawer').classList.toggle('open'); }
+
+function exportCsv() {
+  const entries = Object.entries(state.selected);
+  if (!entries.length) return toast('選定キーワードがありません');
+  const head = 'keyword,monthly_volume,ad_rate,own_position,own_clicks_28d,rival,rival_position,added_at';
+  const body = entries.map(([kw, v]) =>
+    [`"${kw}"`, v.vol ?? '', v.ad ?? '', v.own ?? '圏外', v.clicks ?? '', v.rivalName ?? '', v.rival ?? '', v.addedAt].join(','));
+  const blob = new Blob(['\uFEFF' + [head, ...body].join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `selected-keywords-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  toast('CSVをダウンロードしました');
+}
+
+function copyList() {
+  const kws = Object.keys(state.selected);
+  if (!kws.length) return toast('選定キーワードがありません');
+  navigator.clipboard.writeText(kws.join('\n'));
+  toast(`${kws.length}件をコピーしました`);
+}
+
+function clearAll() {
+  if (!confirm('選定リストを全て解除しますか？')) return;
+  state.selected = {};
+  persist();
+  render();
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+$('q').addEventListener('input', e => { state.q = e.target.value.trim(); state.limit = 100; render(); });
+$('minVol').addEventListener('change', e => { state.minVol = +e.target.value; state.limit = 100; render(); });
+$('gapOnly').addEventListener('change', e => { state.gapOnly = e.target.checked; state.limit = 100; render(); });
+$('top10Only').addEventListener('change', e => { state.top10Only = e.target.checked; state.limit = 100; render(); });
+
+renderFreshness();
+renderBanner();
+renderSellers();
+persist();
+render();
+</script>
+</body>
+</html>
